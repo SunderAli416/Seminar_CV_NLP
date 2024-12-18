@@ -3,3 +3,5 @@ data
 evaluation_results
 .env
 *.json
+/pretrained
+temp_slices
