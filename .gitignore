@@ -1,5 +1,7 @@
 __pycache__
-data
+data/image
 evaluation_results
 .env
-*.json
+env
+# *.json
+pretrained/*
