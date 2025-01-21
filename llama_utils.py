@@ -3,7 +3,8 @@ import base64
 from io import BytesIO
 # import lmdeploy
 from PIL import Image
-llm = OllamaLLM(model="llama3.1")
+
+llm = OllamaLLM(model="llama3.2")
 
 def convert_to_base64(file_path):
     pil_image = Image.open(file_path)
@@ -31,6 +32,30 @@ def call_llama(OCR_INFO,OBJECT_INFO,CAPTION):
     """)
     return response
 
+def call_llama_with_extra_data(OCR_INFO,OBJECT_INFO,CAPTION,extra_tags, extra_detections):
+    query = f"""
+    You are a powerful multimodal model and you should generate detailed description of an image using
+    external information such as:
+    OCR_INFORMATION: {OCR_INFO['<OCR>']},
+    ---------------------------------------------------
+    IMAGE_TAGS: {OBJECT_INFO['<OD>']['labels']},
+    ---------------------------------------------------
+    OBJECT DETECTION INFORMATION: {OBJECT_INFO['<OD>']},
+    ---------------------------------------------------
+    Original Caption: {CAPTION['<CAPTION>']},
+    ---------------------------------------------------
+    Extra Tags: {extra_tags},
+    ---------------------------------------------------
+    Extra object detection information: {extra_detections},
+    ---------------------------------------------------
+    Your job is to utilize all this information to generate one small caption describing the image. The caption can be of 1-5 lines and not much longer
+    Your response should not contain any other information aside from the caption
+    Only include the caption in your response and nothing else
+    Do not include any unwanted intro and any unwanted information in the response aside from the caption
+    """
+    # print(query)
+    response = llm.invoke(query)
+    return response
 
 # def call_llama(OCR_INFO,OBJECT_INFO,CAPTION):
 #     pipe = lmdeploy.pipeline("internlm/llama3.1-chat-8b")

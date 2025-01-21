@@ -6,42 +6,13 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--image", type=str, default="data/image" , help="Path to image dataset")
     parser.add_argument("--tag_run", action='store_true', help="Flag to run image tagging")
-    parser.add_argument("--tag_file", type=str, default='data/tags.json', help="Path to the existing tags file")
+    parser.add_argument("--tag_file", type=str, default='results/tags.json', help="Path to the existing tags file")
     parser.add_argument("--det_run", action='store_true', help="Flag to run object detection")
-    parser.add_argument("--det_file", type=str, default='data/det.json', help="Path to the existing detection file")
+    parser.add_argument("--det_file", type=str, default='results/det.json', help="Path to the existing detection file")
+    parser.add_argument("--cap_run", action='store_true', help="Flag to run initial caption generation")
+    parser.add_argument("--cap_file", type=str, default='results/cap.json', help="Path to existing initial caption")
     args = parser.parse_args()
     return args
-
-output_data = []
-
-# Loop through each image file and perform the inference for each task
-
-
-    # Generate Image Tags
-    # generate_image_tags(img_path)
-
-#     # Run inference with each task type
-#     object_detection_info = run_inference(img_path, '<OD>')
-#     ocr_info = run_inference(img_path, '<OCR>')
-#     detailed_caption = run_inference(img_path, '<CAPTION>')
-    
-#     # Generate final response using call_llama
-#     # base64_image=convert_to_base64(img_path)
-#     # final_response = call_llama(ocr_info, object_detection_info,base64_image)
-#     final_response = call_llama(ocr_info, object_detection_info,detailed_caption)
-#     # basic_response=call_llama_basic(base64_image)
-#     print(f"Response for image {i}: {final_response}")
-#     # print(f"Basic Response for image {i}: {basic_response}")
-#     # Append the result for this image
-#     output_data.append({"id": i, "response": final_response})
-
-# # Save the results to a JSON file
-# output_file = "evaluation_results/amber_evaluation_results.json"
-# with open(output_file, "w") as file:
-#     json.dump(output_data, file, indent=4)
-
-# print(f"Evaluation results saved to {output_file}")
-
 
 # Method to save the data to a file
 def save_file(data, file):
@@ -118,7 +89,63 @@ def detect_objects(dataset_path, tags_collection, det_file):
 
     return tags_collection
 
+def generate_initial_caption(dataset_path, cap_file):
+    print("------------------------------------")
+    print("Using Florance for AMBER dataset")
+    print("------------------------------------")
 
+    from florence_utils import run_inference
+
+    initial_captions = []
+    for i in range(1, 1005):
+        try:
+            image_path =  f"{dataset_path}/AMBER_{i}.jpg"
+            print(image_path)
+
+            object_detection_info = run_inference(image_path, '<OD>')
+            ocr_info = run_inference(image_path, '<OCR>')
+            caption = run_inference(image_path, '<CAPTION>')
+
+            response = {"id": i, "caption": caption, "object_detection_info": object_detection_info, "ocr_info": ocr_info}
+            initial_captions.append(response)
+        except Exception as e:
+            print(f"Error processing image {i}: {e}")
+    
+    print("Florance Run Complete")
+    print(initial_captions)
+    save_file(data=initial_captions, file=cap_file)
+    return initial_captions
+    
+def generate_final_caption(initial_captions ,result_file, tags, detections):
+    print("------------------------------------")
+    print("Using LLAMA")
+    print("------------------------------------")
+    from llama_utils import call_llama, call_llama_with_extra_data
+
+    caption_list = []
+    for i in range(1, 1005):
+        try:
+            ocr_info = initial_captions[i-1]['ocr_info']
+            object_detection_info = initial_captions[i-1]['object_detection_info']
+            caption = initial_captions[i-1]['caption']
+            extra_tags = tags[i-1]['tags']
+            extra_detections = detections[i-1]['detections']
+
+            # response = call_llama(ocr_info, object_detection_info,caption)
+            # print(f"1: Response for image {i}: {response}")
+            
+            response_extra = call_llama_with_extra_data(ocr_info, object_detection_info,caption, extra_tags, extra_detections)
+            caption = {"id": i, "response": response_extra}
+            print(caption)
+            caption_list.append(caption)
+            
+        except Exception as e:
+            print(f"Error processing image {i}: {e}")
+    
+    print("LLAMA Run Complete")
+    print(caption_list)
+    save_file(data=caption_list, file=result_file)
+    return caption_list
 
 def main(args):
 
@@ -139,6 +166,15 @@ def main(args):
                 det_file = args.det_file)
         else:
             object_collection = load_file(file=args.det_file)
+    
+    if args.cap_run or not os.path.exists(args.cap_file):
+        initial_captions = generate_initial_caption(dataset_path = args.image, cap_file = args.cap_file)
+    else:
+        initial_captions = load_file(file=args.cap_file)
+    
+    if(len(initial_captions) != 0):
+        generate_final_caption(initial_captions, "results/result.json", tags_collection, object_collection)
+    
 
 if __name__ == "__main__":
     args = get_args()

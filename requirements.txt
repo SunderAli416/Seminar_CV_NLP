@@ -1,4 +1,5 @@
 einops==0.8.0
+en_core_web_lg==3.8.0
 langchain_ollama==0.2.1
 matplotlib==3.10.0
 nltk==3.9.1
